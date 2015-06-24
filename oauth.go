@@ -425,7 +425,11 @@ func (c *Consumer) makeAccessTokenRequest(params map[string]string, secret strin
 //      - err:
 //        Set only if there was an error, nil otherwise.
 func (c *Consumer) Get(url string, userParams map[string]string, token *AccessToken) (resp *http.Response, err error) {
-	return c.makeAuthorizedRequest("GET", url, LOC_URL, "", userParams, token)
+	return c.makeAuthorizedRequest("GET", url, LOC_URL, "", userParams, nil, token)
+}
+
+func (c *Consumer) GetWithHeaders(url string, userParams map[string]string, userHeaders map[string]string, token *AccessToken) (resp *http.Response, err error) {
+	return c.makeAuthorizedRequest("GET", url, LOC_URL, "", userParams, userHeaders, token)
 }
 
 func encodeUserParams(userParams map[string]string) string {
@@ -438,7 +442,11 @@ func encodeUserParams(userParams map[string]string) string {
 
 // DEPRECATED: Use Post() instead.
 func (c *Consumer) PostForm(url string, userParams map[string]string, token *AccessToken) (resp *http.Response, err error) {
-	return c.PostWithBody(url, "", userParams, token)
+	return c.makeAuthorizedRequest("POST", url, LOC_BODY, "", userParams, nil, token)
+}
+
+func (c *Consumer) PostFormWithHeaders(url string, userParams map[string]string, userHeaders map[string]string, token *AccessToken) (resp *http.Response, err error) {
+	return c.makeAuthorizedRequest("POST", url, LOC_BODY, "", userParams, userHeaders, token)
 }
 
 func (c *Consumer) Post(url string, userParams map[string]string, token *AccessToken) (resp *http.Response, err error) {
@@ -446,15 +454,27 @@ func (c *Consumer) Post(url string, userParams map[string]string, token *AccessT
 }
 
 func (c *Consumer) PostWithBody(url string, body string, userParams map[string]string, token *AccessToken) (resp *http.Response, err error) {
-	return c.makeAuthorizedRequest("POST", url, LOC_BODY, body, userParams, token)
+	return c.makeAuthorizedRequest("POST", url, LOC_URL, body, userParams, nil, token)
+}
+
+func (c *Consumer) PostWithHeaders(url string, body string, userParams map[string]string, userHeaders map[string]string, token *AccessToken) (resp *http.Response, err error) {
+	return c.makeAuthorizedRequest("POST", url, LOC_URL, body, userParams, userHeaders, token)
 }
 
 func (c *Consumer) Delete(url string, userParams map[string]string, token *AccessToken) (resp *http.Response, err error) {
-	return c.makeAuthorizedRequest("DELETE", url, LOC_URL, "", userParams, token)
+	return c.makeAuthorizedRequest("DELETE", url, LOC_URL, "", userParams, nil, token)
+}
+
+func (c *Consumer) DeleteWithHeaders(url string, userParams map[string]string, userHeaders map[string]string, token *AccessToken) (resp *http.Response, err error) {
+	return c.makeAuthorizedRequest("DELETE", url, LOC_URL, "", userParams, userHeaders, token)
 }
 
 func (c *Consumer) Put(url string, body string, userParams map[string]string, token *AccessToken) (resp *http.Response, err error) {
-	return c.makeAuthorizedRequest("PUT", url, LOC_URL, body, userParams, token)
+	return c.makeAuthorizedRequest("PUT", url, LOC_URL, body, userParams, nil, token)
+}
+
+func (c *Consumer) PutWithHeaders(url string, body string, userParams map[string]string, userHeaders map[string]string, token *AccessToken) (resp *http.Response, err error) {
+	return c.makeAuthorizedRequest("PUT", url, LOC_URL, body, userParams, userHeaders, token)
 }
 
 func (c *Consumer) Debug(enabled bool) {
@@ -473,7 +493,7 @@ func (p pairs) Len() int           { return len(p) }
 func (p pairs) Less(i, j int) bool { return p[i].key < p[j].key }
 func (p pairs) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
-func (c *Consumer) makeAuthorizedRequest(method string, url string, dataLocation DataLocation, body string, userParams map[string]string, token *AccessToken) (resp *http.Response, err error) {
+func (c *Consumer) makeAuthorizedRequest(method string, url string, dataLocation DataLocation, body string, userParams map[string]string, userHeaders map[string]string, token *AccessToken) (resp *http.Response, err error) {
 	allParams := c.baseParams(c.consumerKey, c.AdditionalParams)
 
 	// Do not add the "oauth_token" parameter, if the access token has not been
@@ -525,7 +545,7 @@ func (c *Consumer) makeAuthorizedRequest(method string, url string, dataLocation
 	if dataLocation == LOC_BODY {
 		contentType = "application/x-www-form-urlencoded"
 	}
-	return c.httpExecute(method, url+queryParams, contentType, body, authParams)
+	return c.httpExecute(method, url+queryParams, contentType, body, authParams, userHeaders)
 }
 
 type request struct {
@@ -756,7 +776,7 @@ func (c *Consumer) requestString(method string, url string, params *OrderedParam
 }
 
 func (c *Consumer) getBody(method, url string, oauthParams *OrderedParams) (*string, error) {
-	resp, err := c.httpExecute(method, url, "", "", oauthParams)
+	resp, err := c.httpExecute(method, url, "", "", oauthParams, nil)
 	if err != nil {
 		return nil, errors.New("httpExecute: " + err.Error())
 	}
@@ -795,7 +815,7 @@ func (e HTTPExecuteError) Error() string {
 }
 
 func (c *Consumer) httpExecute(
-	method string, urlStr string, contentType string, body string, oauthParams *OrderedParams) (*http.Response, error) {
+	method string, urlStr string, contentType string, body string, oauthParams *OrderedParams, headers map[string]string) (*http.Response, error) {
 	// Create base request.
 	req, err := http.NewRequest(method, urlStr, strings.NewReader(body))
 	if err != nil {
@@ -812,6 +832,9 @@ func (c *Consumer) httpExecute(
 		oauthHdr += key + "=\"" + oauthParams.Get(key) + "\""
 	}
 	req.Header.Add("Authorization", oauthHdr)
+	for headerKey, headerValue := range headers {
+		req.Header.Add(headerKey, headerValue)
+	}
 
 	// Add additional custom headers
 	for key, vals := range c.AdditionalHeaders {
