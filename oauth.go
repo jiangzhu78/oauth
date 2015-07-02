@@ -458,7 +458,7 @@ func (c *Consumer) PostWithBody(url string, body string, userParams map[string]s
 }
 
 func (c *Consumer) PostWithHeaders(url string, body string, userParams map[string]string, userHeaders map[string]string, token *AccessToken) (resp *http.Response, err error) {
-	return c.makeAuthorizedRequest("POST", url, LOC_URL, body, userParams, userHeaders, token)
+	return c.makeAuthorizedRequest("POST", url, LOC_BODY, body, userParams, userHeaders, token)
 }
 
 func (c *Consumer) Delete(url string, userParams map[string]string, token *AccessToken) (resp *http.Response, err error) {
@@ -543,7 +543,7 @@ func (c *Consumer) makeAuthorizedRequest(method string, url string, dataLocation
 
 	contentType := ""
 	if dataLocation == LOC_BODY {
-		contentType = "application/x-www-form-urlencoded"
+		//		contentType = "application/x-www-form-urlencoded"
 	}
 	return c.httpExecute(method, url+queryParams, contentType, body, authParams, userHeaders)
 }
